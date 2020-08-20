@@ -4,6 +4,9 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const ejs = require('ejs');
 const _ = require('lodash');
+const mongoose = require('mongoose');
+
+require('dotenv').config();
 
 const homeStartingContent =
   'Lacus vel facilisis volutpat est velit egestas dui id ornare. Semper auctor neque vitae tempus quam. Sit amet cursus sit amet dictum sit amet justo. Viverra tellus in hac habitasse. Imperdiet proin fermentum leo vel orci porta. Donec ultrices tincidunt arcu non sodales neque sodales ut. Mattis molestie a iaculis at erat pellentesque adipiscing. Magnis dis parturient montes nascetur ridiculus mus mauris vitae ultricies. Adipiscing elit ut aliquam purus sit amet luctus venenatis lectus. Ultrices vitae auctor eu augue ut lectus arcu bibendum at. Odio euismod lacinia at quis risus sed vulputate odio ut. Cursus mattis molestie a iaculis at erat pellentesque adipiscing.';
@@ -21,26 +24,52 @@ app.use(express.static('public'));
 
 const port = process.env.PORT || 3000;
 
-let posts = [];
+const postSchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: true,
+  },
+  content: {
+    type: String,
+    required: true,
+  },
+});
+
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+
+const Post = mongoose.model('Post', postSchema);
 
 app.get('/', (req, res) => {
-  res.render('home', {
-    homeStartingContent: homeStartingContent,
-    posts: posts,
+  Post.find({}, (err, posts) => {
+    res.render('home', {
+      homeStartingContent: homeStartingContent,
+      posts: posts,
+    });
   });
 });
 
-app.get('/posts/:postTitle', (req, res) => {
-  const requestedTitle = _.lowerCase(req.params.postTitle);
-  for (let post of posts) {
-    const storedTitle = _.lowerCase(post.title);
-    if (storedTitle === requestedTitle) {
-      res.render('post', {
-        title: post.title,
-        content: post.content,
-      });
-    }
-  }
+app.get('/posts/:postId', (req, res) => {
+  const requestedId = req.params.postId;
+
+  Post.findOne({ _id: requestedId }, (err, post) => {
+    res.render('post', {
+      title: post.title,
+      content: post.content,
+    });
+  });
+
+  // for (let post of posts) {
+  //   const storedId = post._id;
+  //   if (storedTitle === requestedTitle) {
+  //     res.render('post', {
+  //       title: post.title,
+  //       content: post.content,
+  //     });
+  //   }
+  // }
 });
 
 app.get('/about', (req, res) => {
@@ -56,14 +85,16 @@ app.get('/compose', (req, res) => {
 });
 
 app.post('/compose', (req, res) => {
-  const newPost = {
+  const post = new Post({
     title: req.body.postTitle,
     content: req.body.postContent,
-  };
+  });
 
-  posts.push(newPost);
-
-  res.redirect('/');
+  post.save((err) => {
+    if (!err) {
+      res.redirect('/');
+    }
+  });
 });
 
 app.listen(3000, function () {
